@@ -1,0 +1,370 @@
+With Ranked_branches as (
+select Branch,Sum(Sales),
+		Dense_Rank() over (order by sum(Sales) desc) as branch_rank
+from `supermarket analysis`
+group by Branch
+)
+Select * 
+from Ranked_branches
+where branch_rank = 2; 
+
+-- Q2 (your turn): Using a CTE, rank Payment methods by total sales,
+--  and show only the bottom 1 (i.e., the lowest-performing payment method).
+With Ranked_Payment as (
+select Payment,sum(Sales),
+	rank() over (order by sum(Sales) asc) as payment_rank
+from `supermarket analysis`
+group by Payment
+)
+select *
+From Ranked_payment
+where payment_rank = 1;
+
+-- Q3: Using a CTE, find the Product line with the 2nd highest average Rating.
+With Product_Line_rank as 
+(select `Product line`,avg(Rating), 
+	rank() over (order by avg(Rating) desc) Productline_rank
+from `supermarket analysis`
+group by `Product line`)
+
+select * from Product_Line_rank
+where Productline_rank = 2 ;
+
+-- Q4: Using LAG(), show each transaction's Date, Sales, 
+-- and the difference from the previous transaction's Sales (by row order, not grouped by date this time).
+select `Date`,Sales,
+		LAG(Sales) OVER (ORDER BY `Date`) AS previous_day_sales
+from `supermarket analysis`;
+
+SELECT `Date`, Sales,
+       LAG(Sales) OVER (ORDER BY `Date`) AS previous_sales,
+       Sales - LAG(Sales) OVER (ORDER BY `Date`) AS sales_diff
+FROM `supermarket analysis`;
+
+-- Q5: Using AVG(Sales) OVER () (no GROUP BY, no ORDER BY inside), 
+-- show each transaction's Sales alongside the overall average, and flag it as "Above Average" or "Below Average" using CASE WHEN.
+SELECT Sales,
+       AVG(Sales) OVER () AS overall_avg,
+       CASE 
+           WHEN Sales > AVG(Sales) OVER () THEN 'Above Average'
+           ELSE 'Below Average'
+       END AS sales_flag
+FROM `supermarket analysis`;
+
+-- Q6: Using a CTE, find the City with the highest number of transactions (count of rows), not sales amount.
+With Transaction_Sales as 
+(select City,count(Sales),
+	rank() over (order by Count(*) desc) Highest_Transaction
+from `supermarket analysis`
+group by City)
+select * From Transaction_Sales
+where Highest_Transaction = 1;
+
+-- Q7: Using a CTE, find the Branch with the lowest average Rating, but only among branches with more than 300 transactions.
+
+WITH branch_stats AS (
+    SELECT Branch, 
+           AVG(Rating) AS avg_rating,
+           COUNT(*) AS transaction_count,
+           RANK() OVER (ORDER BY AVG(Rating) ASC) AS rating_rank
+    FROM `supermarket analysis`
+    GROUP BY Branch
+)
+SELECT * FROM branch_stats
+WHERE transaction_count > 300
+ORDER BY avg_rating ASC
+LIMIT 1;
+
+	-- Q8: Using a CTE, find the total sales for each Gender, and show which one is higher by ranking them (rank 1 = highest).
+	With Gender_Rank as (
+	select sum(Sales),Gender,
+		rank () over (order by sum(Sales) desc) as Total_Sales
+	FROM `supermarket analysis`
+	Group by Gender)
+	Select * from Gender_Rank
+	where Total_Sales = 1;
+
+-- Q9 (same pattern, one twist): Using a CTE, find the total sales for each Customer type (Member vs Normal),
+--  and show both ranks — not just rank 1, show all rows with their rank.
+	select sum(Sales),`Customer type`,
+	rank() over(order by sum(Sales) desc) as Sales_rank
+FROM `supermarket analysis`
+Group by `Customer type`;
+
+-- Q10: Using a CTE, rank Product lines by total Quantity sold (not Sales amount), and show only the top 2.
+with Quantity_sold as 
+(select `Product line`,sum(Quantity),
+rank () over(order by sum(Quantity) desc) Product_rank
+from `supermarket analysis`
+group by `Product line`
+)
+select * from Quantity_sold 
+where Product_rank <= 2;
+
+-- Q11: Using a CTE, find the City with the 2nd lowest average Unit price.
+With City_table as 
+(select city,avg(`Unit price`),
+rank () over(order by avg(`Unit price`) asc) Unit_Price
+from `supermarket analysis`
+group by City)
+select * from City_table
+where Unit_Price = 2;
+
+-- Q12 (adds a new twist — filtering by a condition before ranking): Using a CTE,
+-- rank Product lines by total sales, but only among product lines where the average Rating is above 6.5. Show the top 1.
+With Product_line as 
+(select `Product line`,
+	sum(Sales),	
+    avg(Rating),
+	rank() over( order by sum(Sales) desc) Sales_Rank
+from `supermarket analysis`
+group by `Product line`
+Having Avg(Rating) > 6.5)
+
+select * from Product_line 
+where Sales_Rank = 1 ;
+
+WITH product_stats AS (
+    SELECT `Product line`, 
+           SUM(Sales) AS total_sales,
+           AVG(Rating) AS avg_rating,
+           RANK() OVER (ORDER BY SUM(Sales) DESC) AS sales_rank
+    FROM `supermarket analysis`
+    GROUP BY `Product line`
+    HAVING AVG(Rating) > 6.5
+)
+SELECT * FROM product_stats
+WHERE sales_rank = 1;
+
+-- Q13: Using a CTE, find the Payment method with the highest total sales, but only considering transactions from City = "Yangon".
+With Yangon_park as 
+(Select Payment,sum(Sales),City,
+	rank() over(order by sum(Sales) desc) as payment_rank
+from `supermarket analysis`
+where City = 'Yangon'
+group by Payment
+)
+select * from Yangon_park
+where payment_rank = 1
+;
+
+WITH yangon_payments AS (
+    SELECT Payment, SUM(Sales) AS total_sales,
+           RANK() OVER (ORDER BY SUM(Sales) DESC) AS payment_rank
+    FROM `supermarket analysis`
+    WHERE City = 'Yangon'
+    GROUP BY Payment
+)
+SELECT * FROM yangon_payments
+WHERE payment_rank = 1;
+
+-- Q15: Using a CTE, find the Product line with the highest total sales, 
+-- but only considering transactions with Payment = "Ewallet" and Rating above 5.
+with Product_line_table  as 
+(select `Product line`,sum(Sales),
+	rank() over(order by sum(Sales) desc) as Sales_rank
+from `supermarket analysis`
+where Payment = 'Ewallet' and Rating > 5
+group by `Product line`
+)
+Select * from Product_line_table
+where Sales_rank = 1
+;
+
+WITH product_line_table AS (
+    SELECT `Product line`, SUM(Sales) AS total_sales,
+           RANK() OVER (ORDER BY SUM(Sales) DESC) AS sales_rank
+    FROM `supermarket analysis`
+    WHERE Payment = 'Ewallet' AND Rating > 5
+    GROUP BY `Product line`
+)
+SELECT * FROM product_line_table
+WHERE sales_rank = 1;
+
+-- Q16 (combines two filters + HAVING): Using a CTE, find the City with the highest average Rating, 
+-- but only considering Branch = "A" transactions, and only where that city's total Quantity sold is above 100.
+wITH city_rank as 
+(select City,avg(Rating),sum(Quantity),
+rank() over (order by avg(Rating) desc) rank_rating
+from `supermarket analysis`
+where Branch = 'Cairo'
+group by City
+Having sum(Quantity) > 100)
+select *from city_rank 
+where rank_rating = 1
+;
+
+WITH city_rank AS (
+    SELECT City, AVG(Rating) AS avg_rating, SUM(Quantity) AS total_quantity,
+           RANK() OVER (ORDER BY AVG(Rating) DESC) AS rank_rating
+    FROM `supermarket analysis`
+    WHERE Branch = 'Cairo'
+    GROUP BY City
+    HAVING SUM(Quantity) > 100
+)
+SELECT * FROM city_rank
+WHERE rank_rating = 1;
+
+-- Q17: Using a CTE, find the Customer type (Member/Normal) with the highest total sales, 
+-- but only considering transactions from Branch = "Giza" and Payment = "Cash".
+with customer_rank as 
+(select `Customer type`,sum(Sales) as Total_sales,
+rank() over (order by sum(Sales) desc) Sales_rank
+from `supermarket analysis`
+Where Branch = 'Giza' and Payment = 'Cash'
+Group by `Customer type`
+)
+select * from customer_rank
+where Sales_rank = 1
+;
+
+ALTER TABLE `supermarket analysis`
+CHANGE `ï»¿Invoice ID` `Invoice ID` TEXT;
+
+select database();
+use `project_p1`;
+select *
+from `supermarket analysis`;
+
+CREATE TABLE product_groups (
+    product_line VARCHAR(50),
+    category_group VARCHAR(20)
+);
+
+INSERT INTO product_groups VALUES
+('Health and beauty', 'Non-Food'),
+('Electronic accessories', 'Non-Food'),
+('Home and lifestyle', 'Non-Food'),
+('Sports and travel', 'Non-Food'),
+('Food and beverages', 'Food'),
+('Fashion accessories', 'Non-Food');
+
+ALTER TABLE product_groups
+CHANGE  product_line `Product line` TEXT;
+
+select * from product_groups;
+
+-- Question 1 (basic JOIN): Write a query that joins supermarket analysis with product_groups (matching on Product line),
+--  showing Invoice ID, Product line, Sales, and Category Group.
+
+select * 
+from product_groups as Pdt_grps
+inner join `supermarket analysis` as spr_mrkt
+	on pdt_grps.`Product line` = spr_mrkt.`Product line`
+    ;
+
+-- Question 2: Using the JOIN, write a query that shows the total Sales for each Category Group (Food vs Non-Food) 
+-- same result as your Power BI chart, but now in SQL.
+SELECT pd.category_group, SUM(sp.Sales) AS total_sales
+FROM product_groups AS pd
+INNER JOIN `supermarket analysis` AS sp
+    ON pd.`Product line` = sp.`Product line`
+GROUP BY pd.category_group;
+
+-- Question: Write a query showing each City's total sales, 
+-- but only including transactions from the "Food" category group (using your JOIN with product_groups).
+Select City,sum(Sales),pg.category_group
+ from `supermarket analysis` as sp
+ inner join product_groups as pg
+    ON pg.`Product line` = sp.`Product line`
+    Where category_group = 'Food'
+group by City
+;
+
+-- Question: Using the JOIN with product_groups, rank each Category Group (Food vs Non-Food) by total sales — using RANK().
+select sum(Sales),category_group,
+rank () over (order by sum(Sales) desc ) as food_rank
+from `supermarket analysis` as sp
+inner join product_groups as pg
+ON pg.`Product line` = sp.`Product line`
+group by pg.category_group
+;
+
+SELECT COUNT(*) FROM `supermarket analysis`;
+
+SELECT COUNT(*) 
+FROM `supermarket analysis` AS sp
+INNER JOIN product_groups AS pg
+    ON pg.`Product line` = sp.`Product line`;
+    
+SELECT `Product line`, COUNT(*) 
+FROM product_groups
+GROUP BY `Product line`
+HAVING COUNT(*) > 1;
+DELETE FROM product_groups;
+
+INSERT INTO product_groups VALUES
+('Health and beauty', 'Non-Food'),
+('Electronic accessories', 'Non-Food'),
+('Home and lifestyle', 'Non-Food'),
+('Sports and travel', 'Non-Food'),
+('Food and beverages', 'Food'),
+('Fashion accessories', 'Non-Food');
+
+INSERT INTO product_groups VALUES
+('Health and beauty', 'Non-Food'),
+('Electronic accessories', 'Non-Food'),
+('Home and lifestyle', 'Non-Food'),
+('Sports and travel', 'Non-Food'),
+('Food and beverages', 'Food'),
+('Fashion accessories', 'Non-Food');
+
+
+DESCRIBE product_groups;
+
+SELECT COUNT(*) FROM product_groups;
+
+SELECT * FROM product_groups;
+
+select * FROM `supermarket analysis`;
+select `Product line` FROM `supermarket analysis`;
+
+SELECT MIN(Sales) FROM `supermarket analysis`;
+SELECT MAX(Sales) FROM `supermarket analysis`;
+SELECT * FROM (SELECT MIN(Sales) AS min_sales FROM `supermarket analysis`) AS temp;
+SELECT sp.Sales, mt.min_sales
+FROM `supermarket analysis` AS sp
+CROSS JOIN (SELECT MIN(Sales) AS min_sales FROM `supermarket analysis`) AS mt
+LIMIT 10;
+
+SELECT sp.Sales, mt.min_sales, xt.max_sales
+FROM `supermarket analysis` AS sp
+CROSS JOIN (SELECT MIN(Sales) AS min_sales FROM `supermarket analysis`) AS mt
+CROSS JOIN (SELECT MAX(Sales) AS max_sales FROM `supermarket analysis`) AS xt
+LIMIT 10;
+
+SELECT sp.`Product line`, sp.Sales,
+       min_table.min_sales,
+       max_table.max_sales
+FROM `supermarket analysis` AS sp
+CROSS JOIN (SELECT MIN(Sales) AS min_sales FROM `supermarket analysis`) AS min_table
+CROSS JOIN (SELECT MAX(Sales) AS max_sales FROM `supermarket analysis`) AS max_table
+LIMIT 10;
+
+-- Question: Using the same CROSS JOIN setup (Sales + min_sales), add one more column showing the difference between each row's Sales 
+-- and the minimum (Sales − min_sales).
+SELECT Sales, `Product line`,
+       min_table.min_sales,
+       Sales - min_table.min_sales AS sales_above_min
+FROM `supermarket analysis` AS sp
+CROSS JOIN (SELECT MIN(Sales) AS min_sales FROM `supermarket analysis`) AS min_table;
+
+-- Question 11 (introduces LAG): Write a query showing Date and total sales for that date, 
+-- plus a new column showing the previous day's total sales next to it, using LAG().  
+WITH daily_sales AS (
+    SELECT `Date`, SUM(Sales) AS total_sales
+    FROM `supermarket analysis`
+    GROUP BY `Date`
+)
+SELECT `Date`, total_sales,
+       LAG(total_sales) OVER (ORDER BY `Date`) AS previous_day_sales
+FROM daily_sales;
+
+
+SELECT Branch, AVG(Sales) AS branch_avg FROM `supermarket analysis` GROUP BY Branch;
+
+SELECT sp.Branch, sp.Sales, bt.branch_avg,
+       sp.Sales - bt.branch_avg AS diff_from_branch_avg
+FROM `supermarket analysis` AS sp
+JOIN (SELECT Branch, AVG(Sales) AS branch_avg FROM `supermarket analysis` GROUP BY Branch) AS bt
+    ON sp.Branch = bt.Branch;
